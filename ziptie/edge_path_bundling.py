@@ -14,12 +14,13 @@ def bundle(
     generate_curve_points=True
 ):
     """
-    Apply Edge-Path Bundling to a graph.
+    Apply Edge-Path Bundling to a graph with 2D or 3D node positions.
     
     Parameters:
     -----------
     G : networkx.Graph
-        The graph to bundle edges for
+        The graph to bundle edges for. Node positions should be stored in the 'pos' attribute
+        as tuples or arrays of length 2 (2D) or 3 (3D).
     weight_pow : float, optional
         Power to raise edge length to for weighting (default: 2.0)
     k : float, optional
@@ -38,13 +39,17 @@ def bundle(
         List of bundled edges. Each edge is a dict with keys:
         - source: source node ID
         - target: target node ID
-        - points: list of (x, y) coordinates defining the bezier curve (empty if generate_curve_points=False)
-        - control_points: list of (x, y) coordinates of the control points
+        - points: list of coordinates defining the bezier curve (empty if generate_curve_points=False)
+        - control_points: list of coordinates of the control points
     control_points_info : list of dict
         Information about control points used for visualization
     """
     # Get node positions
     pos = nx.get_node_attributes(G, 'pos')
+    
+    # Determine if we're working with 2D or 3D points
+    sample_pos = next(iter(pos.values()))
+    is_3d = len(sample_pos) == 3
     
     # Create a working copy of the graph with weighted edges
     nx_graph = G.copy()
@@ -163,7 +168,7 @@ def bundle(
             # Get control points
             control_points = bundled_edges_map[edge]
             # Convert control points to list of tuples for output
-            control_points_list = [(cp[0], cp[1]) for cp in control_points]
+            control_points_list = [tuple(cp) for cp in control_points]
             
             # Create Bezier curve if requested
             curve_points = []
@@ -175,13 +180,14 @@ def bundle(
                 'target': v,
                 'points': curve_points,
                 'control_points': control_points_list,
-                'is_bundled': True
+                'is_bundled': True,
+                'is_3d': is_3d
             })
         elif reverse_edge in bundled_edges_map:
             # Get control points
             control_points = bundled_edges_map[reverse_edge]
             # Convert control points to list of tuples for output
-            control_points_list = [(cp[0], cp[1]) for cp in control_points]
+            control_points_list = [tuple(cp) for cp in control_points]
             
             # Create Bezier curve if requested
             curve_points = []
@@ -193,7 +199,8 @@ def bundle(
                 'target': v,
                 'points': curve_points,
                 'control_points': control_points_list,
-                'is_bundled': True
+                'is_bundled': True,
+                'is_3d': is_3d
             })
         else:
             # This is a direct edge or a control edge
@@ -212,19 +219,27 @@ def bundle(
                 'points': curve_points,
                 'control_points': control_points_list,
                 'is_bundled': False,
-                'is_control': is_control
+                'is_control': is_control,
+                'is_3d': is_3d
             })
     
     # Create control points info for visualization
     for i, cps in enumerate(control_point_lists):
         for j, cp in enumerate(cps):
             if j > 0 and j < len(cps) - 1:  # Skip source and target
-                control_points_info.append({
-                    'x': cp[0],
-                    'y': cp[1],
+                cp_info = {
                     'is_original': j % smoothing == 0,  # True if this is an original node, not an inserted one
-                    'bundle_id': i
-                })
+                    'bundle_id': i,
+                    'is_3d': is_3d
+                }
+                
+                # Add coordinates based on dimensionality
+                if is_3d:
+                    cp_info.update({'x': cp[0], 'y': cp[1], 'z': cp[2]})
+                else:
+                    cp_info.update({'x': cp[0], 'y': cp[1]})
+                    
+                control_points_info.append(cp_info)
     
     return bundled_edges, control_points_info
 
@@ -263,7 +278,7 @@ def create_bezier_curve(control_points, n_segments):
     # Function to evaluate a Bezier curve at parameter t
     def bezier_point(t):
         n = len(control_points) - 1
-        point = np.zeros(2)
+        point = np.zeros(control_points[0].shape)  # Create point with same dimensions as control points
         for i, p in enumerate(control_points):
             point += comb(n, i) * (1 - t) ** (n - i) * t ** i * p
         return point
@@ -271,6 +286,6 @@ def create_bezier_curve(control_points, n_segments):
     # Generate points along the curve
     for t in np.linspace(0, 1, n_segments):
         point = bezier_point(t)
-        curve_points.append((point[0], point[1]))
+        curve_points.append(tuple(point))
     
     return curve_points
