@@ -14,9 +14,9 @@ print('* libraries loaded')
 # load data from json file
 full_path = os.path.join(
     os.path.dirname(__file__), 
-    # '../data/2n1e.json',
+    '../data/migrations.json',
     # '../data/migrations.json',
-    '../data/glp1.json',
+    # '../data/glp1.json',
 )
 with open(full_path, 'r') as f:
     data = json.load(f)
@@ -71,7 +71,7 @@ max_y = max(p[1] for p in pos.values())
 control_points = [
     # {'x': -50, 'y': 20, 'weight': 10, 'radius': 30},
     {'x': -50, 'y': 20, 'weight': 5, 'radius': 30},
-    {'x': 50, 'y':  40, 'weight': 1, 'radius': 55},
+    # {'x': 50, 'y':  40, 'weight': 1, 'radius': 55},
     # {'x': -98, 'y': 2, 'weight': 1, 'radius': 10},
     # # {'x': -20, 'y': -4, 'weight': 1, 'radius': 10},
     # {'x': -25, 'y': 12, 'weight': 100, 'radius': 15},
@@ -110,6 +110,7 @@ reload(manual_bundling)
 bundled_edges = manual_bundling.bundle(
     G, 
     control_points,
+    n_segments=5,
     distance_threshold=10
 )
 
